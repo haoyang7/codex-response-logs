@@ -1,0 +1,24 @@
+# Local runtime state, captures, and personal Codex data
+/.runtime/
+/work/
+/outputs/
+.codex/
+*.log
+*.log.*
+*.sse
+*.jsonl
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+config.toml
+auth.json
+.env
+.env.*
+
+# Python and operating-system caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.DS_Store

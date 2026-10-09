@@ -1,0 +1,2384 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Codex · 响应日志</title>
+    <script>
+      (() => {
+        let mode = 'system';
+        try {
+          const saved = localStorage.getItem('codex-response-theme');
+          if (['system', 'light', 'dark'].includes(saved)) mode = saved;
+        } catch {}
+        document.documentElement.dataset.themeMode = mode;
+        document.documentElement.dataset.theme =
+          mode === 'system'
+            ? matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light'
+            : mode;
+      })();
+    </script>
+    <style>
+      :root {
+        color-scheme: light;
+        font: 14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+        --bg: #f5f6f3;
+        --surface: #fff;
+        --head: #fafbf8;
+        --text: #26392f;
+        --primary: #293c31;
+        --muted: #5d6d64;
+        --faint: #627065;
+        --teal: #2f775d;
+        --accent: var(--teal);
+        --amber: #88602e;
+        --red: #a34740;
+        --line: #e8ece7;
+        --border: #dfe6de;
+        --accent-bg: #eaf2ec;
+        --hover: #f2f6ef;
+        --focus: #57947a;
+        --detail: #f8faf6;
+        --note-bg: #edf2e8;
+        --note-amber: #f6f0e5;
+        --code-bg: #edf3e6;
+        --shadow: #24372b04;
+        color: var(--text);
+        background: var(--bg);
+      }
+
+      :root[data-theme=dark] {
+        color-scheme: dark;
+        --bg: #141414;
+        --surface: #1c1c1c;
+        --head: #222;
+        --text: #d6d6d6;
+        --primary: #ededed;
+        --muted: #a3a3a3;
+        --faint: #949494;
+        --teal: #a2c3b0;
+        --accent: var(--primary);
+        --amber: #d9b783;
+        --red: #e09b94;
+        --line: #2c2c2c;
+        --border: #353535;
+        --accent-bg: #2b2b2b;
+        --hover: #262626;
+        --focus: #b8b8b8;
+        --detail: #191919;
+        --note-bg: #252525;
+        --note-amber: #322b22;
+        --code-bg: #222;
+        --shadow: #00000030;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 32px 28px;
+      }
+
+      .app {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 24px;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+      }
+
+      .eyebrow {
+        font-size: 10px;
+        color: var(--muted);
+        font-weight: 650;
+        letter-spacing: 2px;
+        margin-bottom: 9px;
+      }
+
+      .title-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      h1 {
+        font-size: 25px;
+        font-weight: 600;
+        letter-spacing: -.7px;
+        margin: 0;
+      }
+
+      .live {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 8px;
+        border-radius: 20px;
+        background: var(--accent-bg);
+        color: var(--teal);
+        font-size: 10px;
+        white-space: nowrap;
+      }
+
+      .live-dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+
+      .tools {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .search-box {
+        position: relative;
+        width: 230px;
+      }
+
+      .search-box svg {
+        position: absolute;
+        left: 12px;
+        top: 11px;
+        color: var(--faint);
+        pointer-events: none;
+      }
+
+      input,button,select {
+        font: inherit;
+      }
+
+      input {
+        width: 100%;
+        height: 36px;
+        padding: 8px 12px 8px 34px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        color: var(--text);
+        font-size: 12px;
+      }
+
+      input::placeholder {
+        color: var(--faint);
+      }
+
+      button,select {
+        cursor: pointer;
+      }
+
+      .action {
+        height: 36px;
+        padding: 0 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .action:hover {
+        background: var(--hover);
+      }
+
+      button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,pre:focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: 3px;
+      }
+
+      .theme-control {
+        position: relative;
+        flex: none;
+      }
+
+      .theme-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 0 10px;
+        color: var(--primary);
+      }
+
+      .theme-button:hover,.theme-button[aria-expanded=true] {
+        background: var(--hover);
+      }
+
+      .theme-button .theme-icon {
+        display: none;
+        flex: none;
+        width: 20px;
+        height: 20px;
+      }
+
+      .theme-label {
+        font-size: 11px;
+        line-height: 1;
+      }
+
+      :root[data-theme-mode=light] .theme-button .icon-light,:root[data-theme-mode=dark] .theme-button .icon-dark,:root[data-theme-mode=system] .theme-button .icon-system {
+        display: block;
+      }
+
+      .theme-menu {
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 0;
+        z-index: 10;
+        width: 176px;
+        padding: 5px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--surface);
+        box-shadow: 0 8px 24px #00000018,0 2px 6px var(--shadow);
+      }
+
+      .theme-menu-label {
+        padding: 6px 9px;
+        font-size: 10px;
+        color: var(--muted);
+      }
+
+      .theme-option {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        width: 100%;
+        min-height: 36px;
+        padding: 8px 9px;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        color: var(--primary);
+        font-size: 12px;
+        text-align: left;
+      }
+
+      .theme-option svg {
+        flex: none;
+      }
+
+      .theme-option:hover,.theme-option:focus-visible {
+        background: var(--hover);
+      }
+
+      .theme-option:focus-visible {
+        outline-offset: -2px;
+      }
+
+      .theme-option[aria-checked=true] {
+        color: var(--accent);
+      }
+
+      .theme-copy {
+        flex: 1;
+      }
+
+      .theme-copy small {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .theme-check {
+        margin-left: auto;
+        visibility: hidden;
+      }
+
+      .theme-option[aria-checked=true] .theme-check {
+        visibility: visible;
+      }
+
+      .theme-separator {
+        height: 1px;
+        margin: 4px;
+        background: var(--line);
+      }
+
+      .sheet {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface);
+        overflow: hidden;
+        box-shadow: 0 3px 12px var(--shadow);
+      }
+
+      .table-toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .tabs {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+
+      .tab {
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--muted);
+        padding: 7px 10px;
+        font-size: 12px;
+      }
+
+      .tab:hover {
+        background: var(--hover);
+      }
+
+      .tab[aria-pressed=true] {
+        background: var(--accent-bg);
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .table-meta {
+        font-size: 11px;
+        color: var(--muted);
+        padding-right: 3px;
+        white-space: nowrap;
+      }
+
+      .latest {
+        border: 0;
+        border-radius: 6px;
+        padding: 7px 10px;
+        background: var(--accent-bg);
+        color: var(--accent);
+        font-size: 11px;
+      }
+
+      .latest:hover {
+        background: var(--hover);
+      }
+
+      [hidden] {
+        display: none!important;
+      }
+
+      .table-wrap {
+        overflow: auto;
+        overflow-anchor: none;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+        max-height: calc(100dvh - 251px);
+        min-height: 220px;
+      }
+
+      .table-wrap:focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: -2px;
+      }
+
+      table {
+        border-collapse: separate;
+        border-spacing: 0;
+        width: 100%;
+        min-width: 740px;
+        table-layout: fixed;
+        text-align: left;
+      }
+
+      .col-time {
+        width: 124px;
+      }
+
+      .col-state {
+        width: 94px;
+      }
+
+      .col-transport {
+        width: 72px;
+      }
+
+      .transport-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 1px 6px;
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        color: var(--primary);
+        font-size: 10px;
+        line-height: 18px;
+      }
+
+      .col-models {
+        width: 220px;
+      }
+
+      .col-effort {
+        width: 204px;
+      }
+
+      .col-tokens {
+        width: 102px;
+      }
+
+      .col-expand {
+        width: 44px;
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: var(--head);
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 500;
+        padding: 11px 16px;
+        white-space: nowrap;
+      }
+
+      th small {
+        display: block;
+        font-size: 10px;
+        font-weight: 400;
+        color: var(--faint);
+        margin-top: 3px;
+      }
+
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 12px 16px;
+        vertical-align: middle;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      thead th:last-child,.record-row td:last-child {
+        padding-left: 0;
+        padding-right: 0;
+      }
+
+      thead th:last-child {
+        right: 0;
+        z-index: 3;
+      }
+
+      .record-row td:last-child {
+        position: sticky;
+        right: 0;
+        z-index: 1;
+        background: var(--surface);
+      }
+
+      .record-row:last-child td {
+        border-bottom: 0;
+      }
+
+      .record-row:hover td,.record-row.is-expanded td {
+        background: var(--hover);
+      }
+
+      .primary {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-weight: 500;
+        color: var(--primary);
+        line-height: 20px;
+      }
+
+      .secondary {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 10.5px;
+        line-height: 15px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .conversation .primary {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        font-size: 13px;
+        line-height: 20px;
+      }
+
+      .models {
+        display: grid;
+        gap: 2px;
+        color: var(--primary);
+      }
+
+      .model-line {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .model-label {
+        flex: none;
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .model-value {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 12px;
+        line-height: 18px;
+      }
+
+      .mono,.number {
+        font-family: ui-monospace,"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -.2px;
+      }
+
+      .number {
+        text-align: right;
+      }
+
+      .number .primary {
+        font-size: 14px;
+        font-weight: 550;
+      }
+
+      .muted {
+        color: var(--faint)!important;
+      }
+
+      .teal {
+        color: var(--teal);
+      }
+
+      .amber {
+        color: var(--amber);
+      }
+
+      .red {
+        color: var(--red);
+      }
+
+      .state {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+
+      .state-dot {
+        height: 5px;
+        width: 5px;
+        background: currentColor;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      .effort {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        white-space: nowrap;
+        font-size: 13px;
+        line-height: 20px;
+      }
+
+      .effort-value {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .effort-arrow {
+        font-family: inherit;
+        color: var(--faint);
+        font-size: 14px;
+      }
+
+      .return-effort {
+        font-weight: 600;
+      }
+
+      .expand {
+        display: block;
+        width: 32px;
+        height: 32px;
+        margin: 0 auto;
+        padding: 0;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--faint);
+        font-size: 23px;
+        line-height: 1;
+        transition: transform .15s;
+      }
+
+      .expand:hover {
+        background: var(--accent-bg);
+        color: var(--accent);
+      }
+
+      .expand[aria-expanded=true] {
+        transform: rotate(90deg);
+        color: var(--accent);
+      }
+
+      .detail-row td {
+        padding: 0;
+        background: var(--detail);
+      }
+
+      .detail-panel {
+        padding: 22px 24px 24px;
+        border-top: 1px solid var(--border);
+      }
+
+      .detail-heading {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 14px;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+      }
+
+      .detail-title {
+        flex: 1;
+        min-width: 180px;
+      }
+
+      .detail-heading h2 {
+        margin: 0 0 5px;
+        font-size: 14px;
+        font-weight: 550;
+        overflow-wrap: anywhere;
+      }
+
+      .detail-meta {
+        margin: 0;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .detail-actions {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .copy-action {
+        height: 28px;
+        padding: 0 8px;
+        font-size: 10.5px;
+      }
+
+      .copy-action:disabled {
+        cursor: wait;
+        opacity: .6;
+      }
+
+      .copy-feedback {
+        min-height: 15px;
+        margin: 4px 0 0;
+        font-size: 10px;
+        color: var(--muted);
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 28px;
+      }
+
+      .detail-panel h3 {
+        margin: 0 0 12px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+      }
+
+      .detail-fields {
+        margin: 0;
+        display: grid;
+        grid-template-columns: 105px minmax(0,1fr);
+        gap: 9px 10px;
+        align-items: baseline;
+      }
+
+      .detail-fields dt {
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .detail-fields dd {
+        margin: 0;
+        font-size: 11px;
+        line-height: 1.6;
+        color: var(--primary);
+        overflow-wrap: anywhere;
+      }
+
+      .detail-identity,.detail-usage {
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px solid var(--line);
+      }
+
+      .usage-grid {
+        display: grid;
+        grid-template-columns: repeat(6,minmax(0,1fr));
+        gap: 14px;
+        margin: 0;
+      }
+
+      .usage-grid dt {
+        font-size: 10.5px;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+
+      .usage-grid dd {
+        margin: 0;
+        font-size: 14px;
+        color: var(--primary);
+      }
+
+      .detail-comparison {
+        margin: 18px 0 0;
+        padding: 10px 13px;
+        border-radius: 6px;
+        background: var(--note-bg);
+        font-size: 11px;
+        line-height: 1.7;
+        color: var(--teal);
+      }
+
+      .detail-comparison.amber {
+        background: var(--note-amber);
+        color: var(--amber);
+      }
+
+      .detail-error {
+        margin: 12px 0 0;
+        font-size: 11px;
+        line-height: 1.8;
+        color: var(--red);
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+      }
+
+      .detail-note {
+        margin: 12px 0 0;
+        font-size: 10.5px;
+        line-height: 1.7;
+        color: var(--muted);
+      }
+
+      .raw-fields {
+        margin-top: 16px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+
+      .raw-fields summary {
+        cursor: pointer;
+        width: max-content;
+      }
+
+      .raw-fields pre {
+        max-height: 280px;
+        overflow: auto;
+      }
+
+      .empty {
+        text-align: center;
+        padding: 65px 25px;
+        color: var(--muted);
+      }
+
+      .empty strong {
+        display: block;
+        color: var(--primary);
+        font-weight: 500;
+        font-size: 15px;
+      }
+
+      .empty p {
+        font-size: 12px;
+        line-height: 1.8;
+        max-width: 64ch;
+        margin: 8px auto 12px;
+        overflow-wrap: anywhere;
+      }
+
+      .table-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        padding: 11px 18px;
+        border-top: 1px solid var(--line);
+        background: var(--head);
+        font-size: 10.5px;
+        color: var(--muted);
+      }
+
+      #updated {
+        white-space: nowrap;
+      }
+
+      #error {
+        color: var(--red);
+        font-size: 12px;
+        margin: 12px 2px;
+      }
+
+      #error:empty {
+        display: none;
+      }
+
+      .system-details {
+        margin-top: 15px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.8;
+      }
+
+      .system-details summary {
+        cursor: pointer;
+        width: max-content;
+      }
+
+      .system-content {
+        margin-top: 12px;
+        padding: 4px 18px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--detail);
+      }
+
+      .system-details p {
+        max-width: 1000px;
+        overflow-wrap: anywhere;
+      }
+
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        padding: 12px 15px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--code-bg);
+        color: var(--primary);
+        font-size: 11px;
+        line-height: 1.8;
+      }
+
+      @media(max-width:1000px) {
+        th,td {
+          padding-left: 12px;
+          padding-right: 12px;
+        }
+        .detail-panel {
+          padding: 20px;
+        }
+        .detail-grid {
+          gap: 22px;
+        }
+        .detail-fields {
+          grid-template-columns: 90px minmax(0,1fr);
+          gap: 9px 8px;
+        }
+        .usage-grid {
+          grid-template-columns: repeat(3,minmax(0,1fr));
+        }
+      }
+
+      @media(max-width:700px) {
+        body {
+          padding: 22px 15px;
+        }
+        header {
+          gap: 18px;
+          margin-bottom: 18px;
+        }
+        .tools {
+          width: 100%;
+        }
+        .search-box {
+          flex: 1;
+          min-width: 0;
+          width: auto;
+        }
+        .table-toolbar {
+          gap: 8px;
+          padding: 10px;
+        }
+        .table-meta {
+          padding: 0 10px;
+        }
+        .table-wrap {
+          max-height: calc(100dvh - 286px);
+        }
+        .detail-grid {
+          grid-template-columns: 1fr;
+        }
+        .table-footer {
+          padding: 10px 12px;
+        }
+      }
+
+      @media(max-width:1000px) {
+        table {
+          display: block;
+          min-width: 0;
+        }
+        colgroup {
+          display: none;
+        }
+        thead {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          overflow: hidden;
+          clip-path: inset(50%);
+        }
+        tbody {
+          display: block;
+        }
+        .record-row {
+          display: grid;
+          grid-template-columns: 100px minmax(0,1fr) 74px 28px;
+          gap: 7px 10px;
+          padding: 13px 12px;
+          border-bottom: 1px solid var(--line);
+          align-items: center;
+        }
+        .record-row td {
+          padding: 0;
+          border: 0;
+          min-width: 0;
+        }
+        .record-row:hover,.record-row.is-expanded {
+          background: var(--hover);
+        }
+        .record-row td:nth-child(1) {
+          grid-area: 1/1;
+        }
+        .record-row td:nth-child(2) {
+          grid-area: 1/3;
+        }
+        .record-row td:nth-child(3) {
+          grid-area: 2/3;
+        }
+        .record-row td:nth-child(4) {
+          grid-area: 1/2;
+        }
+        .record-row td:nth-child(5) {
+          grid-area: 2/1/3/3;
+        }
+        .record-row td:nth-child(6) {
+          grid-area: 3/1/4/3;
+        }
+        .record-row td:nth-child(7) {
+          grid-area: 3/3;
+        }
+        .record-row td:last-child {
+          grid-area: 1/4/4/5;
+          position: static;
+          background: transparent;
+        }
+        .record-row td:nth-child(6)::before,.record-row td:nth-child(7)::before {
+          display: block;
+          color: var(--muted);
+          font: 10px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+          margin-bottom: 4px;
+        }
+        .record-row td:nth-child(6)::before {
+          content: '请求 → 首次 → 最终';
+        }
+        .record-row td:nth-child(7)::before {
+          content: '推理 tokens';
+        }
+        .record-row .expand {
+          width: 28px;
+        }
+        .record-row .state {
+          font-size: 11px;
+          gap: 5px;
+        }
+        .record-row .secondary {
+          font-size: 10px;
+        }
+        .detail-row,.detail-row td {
+          display: block;
+          width: 100%;
+        }
+        .empty {
+          display: block;
+          width: 100%;
+          padding: 50px 20px;
+        }
+      }
+
+      @media(prefers-reduced-motion:reduce) {
+        .expand {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <header>
+        <div>
+          <div class="eyebrow">CODEX</div>
+          <div class="title-row">
+            <h1>响应日志</h1>
+            <div class="live"><span class="live-dot"></span><span id="live">连接中</span></div>
+          </div>
+        </div>
+        <div class="tools">
+          <div class="search-box">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              aria-hidden="true"
+            >
+              <circle cx="8.5" cy="8.5" r="5.5" />
+              <path d="m13 13 4 4" /></svg
+            ><input
+              id="search"
+              type="search"
+              placeholder="搜索对话、模型或 ID"
+              aria-label="筛选日志"
+              aria-keyshortcuts="/"
+              title="按 / 搜索，Esc 清除"
+            />
+          </div>
+          <button class="action" id="pause">暂停更新</button>
+          <div class="theme-control" id="theme-control">
+            <button
+              type="button"
+              class="action theme-button"
+              id="theme"
+              aria-label="切换主题"
+              title="切换主题"
+              aria-haspopup="menu"
+              aria-controls="theme-menu"
+              aria-expanded="false"
+            >
+              <svg
+                class="theme-icon icon-light"
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="4" />
+                <path
+                  d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"
+                />
+              </svg>
+              <svg
+                class="theme-icon icon-dark"
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M20.9 13A9 9 0 0 1 11 3.1a9 9 0 1 0 9.9 9.9Z" />
+              </svg>
+              <svg
+                class="theme-icon icon-system"
+                width="17"
+                height="17"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="3" y="4" width="18" height="13" rx="2" />
+                <path d="M8 21h8m-4-4v4" />
+              </svg>
+              <span class="theme-label" id="theme-label" aria-hidden="true">跟随系统</span>
+            </button>
+            <div id="theme-menu" class="theme-menu" role="menu" aria-label="选择主题" hidden>
+              <div class="theme-menu-label" role="presentation">外观</div>
+              <button
+                type="button"
+                class="theme-option"
+                role="menuitemradio"
+                data-theme-option="light"
+                aria-checked="false"
+                tabindex="-1"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="4" />
+                  <path
+                    d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"
+                  />
+                </svg>
+                <span class="theme-copy">浅色</span
+                ><svg
+                  class="theme-check"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m5 12 4 4L19 6" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                class="theme-option"
+                role="menuitemradio"
+                data-theme-option="dark"
+                aria-checked="false"
+                tabindex="-1"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M20.9 13A9 9 0 0 1 11 3.1a9 9 0 1 0 9.9 9.9Z" />
+                </svg>
+                <span class="theme-copy">深色</span
+                ><svg
+                  class="theme-check"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m5 12 4 4L19 6" />
+                </svg>
+              </button>
+              <div class="theme-separator" role="separator"></div>
+              <button
+                type="button"
+                class="theme-option"
+                role="menuitemradio"
+                data-theme-option="system"
+                aria-checked="true"
+                tabindex="-1"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="4" width="18" height="13" rx="2" />
+                  <path d="M8 21h8m-4-4v4" />
+                </svg>
+                <span class="theme-copy">跟随系统<small id="theme-system-state"></small></span
+                ><svg
+                  class="theme-check"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m5 12 4 4L19 6" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+      <section class="sheet" aria-label="响应记录">
+        <div class="table-toolbar">
+          <div class="tabs" role="group" aria-label="响应筛选">
+            <button class="tab" data-filter="all" aria-pressed="true">全部</button
+            ><button class="tab" data-filter="mismatch" aria-pressed="false">不一致</button
+            ><button class="tab" data-filter="failed" aria-pressed="false">失败</button
+            ><button class="tab" data-filter="unlinked" aria-pressed="false">待关联</button>
+          </div>
+          <div class="table-meta">
+            <span id="position-hint">北京时间 · 最新在前</span
+            ><button id="latest" class="latest" hidden title="返回顶部，查看最新响应">↑ 回到最新</button>
+          </div>
+        </div>
+        <div
+          class="table-wrap"
+          id="records-viewport"
+          tabindex="0"
+          role="region"
+          aria-label="响应日志列表"
+        >
+          <table aria-label="请求与响应记录">
+            <colgroup>
+              <col class="col-time" />
+              <col class="col-state" />
+              <col class="col-transport" />
+              <col />
+              <col class="col-models" />
+              <col class="col-effort" />
+              <col class="col-tokens" />
+              <col class="col-expand" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th title="按原始证据显示请求开始、响应创建或日志记录时间">时间</th>
+                <th>状态</th>
+                <th title="每条响应实际记录的传输方式；WS 表示 WebSocket">传输</th>
+                <th>对话</th>
+                <th title="分别显示本地请求模型与服务端返回模型">模型</th>
+                <th title="从左至右：本地请求档位、首个响应档位、最终响应档位">推理档位<small>请求 → 首次 → 最终</small>
+                </th>
+                <th class="number">推理 tokens</th>
+                <th aria-label="展开详情"></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div class="table-footer">
+          <span
+            ><span id="count">0 条响应</span><span aria-hidden="true"> · </span
+            ><span id="window">最近记录</span></span
+          ><span id="updated">等待读取</span>
+        </div>
+      </section>
+      <p id="error" role="alert"></p>
+      <details class="system-details" id="setup">
+        <summary>字段说明与采集状态</summary>
+        <div class="system-content">
+          <p>时间下方标注日期与来源；「—」表示未记录，「…」表示等待终态。传输列中的 WS 表示 WebSocket，悬停可查看完整名称。模型分行显示本地请求与服务端返回值；档位从左至右为本地请求、首个返回、最终返回。行末可展开模型、档位、完整时间、用量、错误、ID 与轮次；搜索也支持这些字段。按 / 开始搜索，Esc 清除搜索或收起详情。向下翻阅时保留阅读位置，可点「回到最新」返回顶部。右上角的主题图标可选择浅色、深色或跟随系统，默认跟随系统。</p>
+          <p id="status"></p>
+          <p id="retention"></p>
+          <p id="sources"></p>
+          <p>常规日志目录可能为空；桌面日志中也可以包含 SSE / WebSocket 响应事件。</p>
+          <p id="trigger"></p>
+          <p>表格仅显示最近的响应，超过上限时较早记录移出；原始日志文件由 Codex 写入，不受表格条数限制。请求模型与档位来自本地会话记录，返回值来自 SSE / WebSocket 原文。未关联记录会在会话信息到达后补齐。服务端响应历时不包含完整客户端请求过程，不能当作端到端耗时。</p>
+          <p>结束进行中的任务并完全退出桌面应用后，在 macOS 终端运行。应用可能显示为 Codex 或 ChatGPT，命令按应用标识定位：</p>
+          <pre>open -b com.openai.codex \
+  --env 'RUST_LOG=warn,codex_api=trace,tungstenite::protocol=trace,tungstenite::protocol::frame=off' \
+  --env 'CODEX_MAX_LOG_LEVEL=debug'</pre>
+          <p>若系统找不到该应用，请在访达中确认实际位置，将 <code>-b com.openai.codex</code> 替换为 <code>-a "/实际路径/应用名称.app"</code>。</p>
+          <p>已有完整响应日志时，无需重复启动 Codex。历史记录中未落盘的字段无法补采；返回档位仅表示服务端回传值。</p>
+        </div>
+      </details>
+    </main>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const columns = ['time', 'match', 'transport', 'title', 'models', 'effort', 'reasoning_tokens', 'expand'];
+      const rowNodes = new Map();
+      const unseenIds = new Set();
+      const searchCache = new WeakMap();
+      const clockFormat = new Intl.DateTimeFormat('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23'
+      });
+      const dateFormat = new Intl.DateTimeFormat('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23'
+      });
+      const numberFormat = new Intl.NumberFormat('zh-CN');
+      let data = { rows: [] },
+        paused = false,
+        etag = null,
+        timer = null,
+        inFlight = false,
+        filter = 'all',
+        expandedId = null,
+        detailRecord = null,
+        detailView = null,
+        renderFrame = null,
+        controller = null,
+        retryDelay = 1000;
+      const viewport = $('records-viewport'),
+        bodyRows = $('rows'),
+        tableHead = viewport.querySelector('thead');
+      const detailRow = document.createElement('tr');
+      detailRow.className = 'detail-row';
+      detailRow.id = 'response-details';
+      const detailCell = document.createElement('td');
+      detailCell.colSpan = columns.length;
+      detailRow.append(detailCell);
+      const emptyRow = document.createElement('tr'),
+        emptyCell = document.createElement('td'),
+        emptyTitle = document.createElement('strong'),
+        emptyText = document.createElement('p'),
+        clearFilters = document.createElement('button');
+      clearFilters.className = 'action';
+      clearFilters.textContent = '清除筛选';
+      clearFilters.addEventListener('click', () => {
+        filter = 'all';
+        $('search').value = '';
+        renderFromTop();
+        $('search').focus();
+      });
+      emptyCell.colSpan = columns.length;
+      emptyCell.className = 'empty';
+      emptyCell.append(emptyTitle, emptyText, clearFilters);
+      emptyRow.append(emptyCell);
+
+      function setText(node, value) {
+        if (node.textContent !== String(value)) node.textContent = String(value);
+      }
+      function shortId(value) {
+        if (!value) return '等待会话记录';
+        const text = value.replace(/^resp_/, '');
+        return text.length > 18 ? text.slice(0, 8) + '…' + text.slice(-6) : text;
+      }
+      function formatTime(value, full = false) {
+        if (typeof value !== 'number' || !Number.isFinite(value)) return '未记录';
+        const date = new Date(value * 1000);
+        if (Number.isNaN(date.getTime())) return '未记录';
+        const fraction = Number.isInteger(value)
+          ? ''
+          : '.' + String(date.getUTCMilliseconds()).padStart(3, '0');
+        return full
+          ? dateFormat.format(date).replaceAll('/', '-') + fraction + '（北京时间）'
+          : clockFormat.format(date);
+      }
+      function rowTime(row) {
+        if (row.request_started_at != null)
+          return { at: row.request_started_at, label: '请求开始', source: '请求开始时间' };
+        if (row.response_created_at != null)
+          return { at: row.response_created_at, label: '响应创建', source: '服务端响应创建时间' };
+        return { at: row.first_logged_at, label: '日志记录', source: '日志记录时间' };
+      }
+      function duration(value) {
+        return value == null ? '未记录' : numberFormat.format(value / 1000) + ' s';
+      }
+      function matchLabel(row) {
+        return row.match === 'match' ? '一致' : row.match === 'mismatch' ? '不一致' : '待核验';
+      }
+      function comparison(row) {
+        const differences = [];
+        if (
+          row.request_model != null &&
+          row.response_model != null &&
+          row.request_model !== row.response_model
+        )
+          differences.push('模型：' + row.request_model + ' → ' + row.response_model);
+        if (
+          row.request_effort != null &&
+          row.first_effort != null &&
+          row.request_effort !== row.first_effort
+        )
+          differences.push('首个档位：' + row.request_effort + ' → ' + row.first_effort);
+        if (
+          row.request_effort != null &&
+          row.final_effort != null &&
+          row.request_effort !== row.final_effort
+        )
+          differences.push('最终档位：' + row.request_effort + ' → ' + row.final_effort);
+        return differences.length
+          ? differences.join('；')
+          : row.match === 'match'
+            ? '模型、首个档位和最终档位与本地请求记录一致。'
+            : '比较所需字段尚未全部记录，暂不能判定一致。';
+      }
+      function cellView(row, key) {
+        if (key === 'transport')
+          return {
+            main: row.transport === 'WebSocket' ? 'WS' : (row.transport ?? '—'),
+            sub: '',
+            style: row.transport == null ? 'muted' : '',
+            title: row.transport == null ? '传输方式未记录' : '传输方式：' + row.transport
+          };
+        if (key === 'match') {
+          const title = row.status + '。' + comparison(row);
+          if (row.status === '失败')
+            return {
+              main: row.error_code === 'rate_limit_exceeded' ? '限流' : '失败',
+              sub:
+                row.match === 'mismatch'
+                  ? '参数不一致'
+                  : row.error_code === 'rate_limit_exceeded'
+                    ? '请求失败'
+                    : '',
+              style: 'red',
+              title
+            };
+          if (row.status !== '已完成')
+            return {
+              main: row.status === '仅耗时日志' ? '仅耗时' : row.status,
+              sub: row.match === 'mismatch' ? '参数不一致' : '',
+              style:
+                row.status === '未完成' || row.match === 'mismatch'
+                  ? 'amber'
+                  : row.status === '响应中'
+                    ? 'teal'
+                    : 'muted',
+              title
+            };
+          return {
+            main: matchLabel(row),
+            sub: '已完成',
+            style: row.match === 'match' ? 'teal' : row.match === 'mismatch' ? 'amber' : 'muted',
+            title
+          };
+        }
+        if (key === 'time') {
+          const value = rowTime(row),
+            full = formatTime(value.at, true),
+            known = full !== '未记录';
+          return {
+            main: known ? formatTime(value.at) : '—',
+            sub: known ? full.slice(5, 10) + ' · ' + value.label : '',
+            style: 'mono' + (known ? '' : ' muted'),
+            title: value.source + '：' + full
+          };
+        }
+        if (key === 'title')
+          return {
+            main: row.title ?? (row.thread_id ? '未命名对话' : '等待关联'),
+            sub: !row.thread_id ? '会话记录尚未到达' : '',
+            style: row.title == null ? 'muted' : '',
+            title: row.title ?? '等待本地会话记录'
+          };
+        if (key === 'models') {
+          const mismatch =
+            row.request_model != null &&
+            row.response_model != null &&
+            row.request_model !== row.response_model;
+          return {
+            main: row.request_model ?? '—',
+            returned: row.response_model ?? '—',
+            sub: '',
+            style: '',
+            requestMissing: row.request_model == null,
+            returnStyle: row.response_model == null ? 'muted' : mismatch ? 'amber' : '',
+            title:
+              '请求模型：' +
+              (row.request_model ?? '未记录') +
+              '\n返回模型：' +
+              (row.response_model ?? '未记录') +
+              (mismatch ? '（与请求不一致）' : '')
+          };
+        }
+        if (key === 'effort')
+          return {
+            main: row.request_effort ?? '—',
+            first: row.first_effort ?? '—',
+            returned: row.final_effort ?? (row.status === '响应中' ? '…' : '—'),
+            sub: '',
+            style: 'mono',
+            requestMissing: row.request_effort == null,
+            firstStyle:
+              row.first_effort == null
+                ? 'muted'
+                : row.request_effort != null && row.request_effort !== row.first_effort
+                  ? 'amber'
+                  : '',
+            returnStyle:
+              row.final_effort == null
+                ? 'muted'
+                : row.request_effort != null && row.request_effort !== row.final_effort
+                  ? 'amber'
+                  : '',
+            title:
+              '本地请求：' +
+              (row.request_effort ?? '未记录') +
+              '\n首个返回：' +
+              (row.first_effort ?? '未记录') +
+              '\n最终返回：' +
+              (row.final_effort ?? (row.status === '响应中' ? '待完成' : '未记录'))
+          };
+        const value = row[key];
+        return {
+          main: value == null ? '—' : numberFormat.format(value),
+          sub: '',
+          style: value == null ? 'muted' : 'mono',
+          title: value == null ? '推理 tokens 未记录' : '终态响应中的推理 tokens'
+        };
+      }
+      function responseRow(row) {
+        let entry = rowNodes.get(row.response_id);
+        if (!entry) {
+          const node = document.createElement('tr');
+          node.className = 'record-row';
+          node.dataset.responseId = row.response_id;
+          for (const key of columns) {
+            const cell = document.createElement('td');
+            if (key === 'reasoning_tokens') cell.className = 'number';
+            if (key === 'title') cell.className = 'conversation';
+            node.append(cell);
+          }
+          const button = document.createElement('button');
+          button.className = 'expand';
+          button.textContent = '›';
+          button.setAttribute('aria-controls', 'response-details');
+          node.lastElementChild.append(button);
+          entry = { node, values: [], button, open: null, row: null };
+          rowNodes.set(row.response_id, entry);
+        }
+        const open = expandedId === row.response_id;
+        if (entry.row === row && entry.open === open) return entry.node;
+        if (entry.row !== row) {
+          columns.slice(0, -1).forEach((column, index) => {
+            const value = cellView(row, column),
+              signature = JSON.stringify(value);
+            if (entry.values[index] === signature) return;
+            const cell = entry.node.cells[index],
+              primary = document.createElement('span');
+            primary.className = 'primary ' + value.style;
+            primary.textContent = value.main;
+            cell.title = value.title;
+            if (column === 'transport') {
+              primary.className = 'transport-badge mono ' + value.style;
+              cell.setAttribute('aria-label', value.title);
+            }
+            if (column === 'match') {
+              primary.className = 'state ' + value.style;
+              const dot = document.createElement('span');
+              dot.className = 'state-dot';
+              dot.setAttribute('aria-hidden', 'true');
+              primary.prepend(dot);
+            }
+            if (column === 'models') {
+              primary.className = 'models';
+              primary.textContent = '';
+              cell.setAttribute('aria-label', value.title.replaceAll('\n', '，'));
+              for (const [label, text, style] of [
+                ['请求', value.main, value.requestMissing ? 'muted' : ''],
+                ['返回', value.returned, value.returnStyle]
+              ]) {
+                const line = document.createElement('span'),
+                  name = document.createElement('span'),
+                  model = document.createElement('span');
+                line.className = 'model-line';
+                name.className = 'model-label';
+                name.textContent = label;
+                model.className = 'model-value mono' + (style ? ' ' + style : '');
+                model.textContent = text;
+                line.append(name, model);
+                primary.append(line);
+              }
+            }
+            if (column === 'effort') {
+              primary.className = 'effort mono';
+              const request = document.createElement('span'),
+                arrow = document.createElement('span'),
+                first = document.createElement('span'),
+                returned = document.createElement('span');
+              request.className = 'effort-value' + (value.requestMissing ? ' muted' : '');
+              request.textContent = value.main;
+              arrow.className = 'effort-arrow';
+              arrow.textContent = '→';
+              arrow.setAttribute('aria-hidden', 'true');
+              first.className = 'effort-value first-effort ' + value.firstStyle;
+              first.textContent = value.first;
+              returned.className = 'effort-value return-effort ' + value.returnStyle;
+              returned.textContent = value.returned;
+              primary.setAttribute('aria-label', value.title.replaceAll('\n', '，'));
+              primary.replaceChildren(request, arrow, first, arrow.cloneNode(true), returned);
+            }
+            cell.replaceChildren(primary);
+            if (value.sub) {
+              const secondary = document.createElement('span');
+              secondary.className = 'secondary';
+              secondary.textContent = value.sub;
+              cell.append(secondary);
+            }
+            entry.values[index] = signature;
+          });
+        }
+        if (entry.open !== open) {
+          entry.node.classList.toggle('is-expanded', open);
+          entry.button.setAttribute('aria-expanded', String(open));
+          entry.button.setAttribute(
+            'aria-label',
+            (open ? '收起' : '展开') + '响应 ' + shortId(row.response_id) + ' 的详情'
+          );
+          entry.open = open;
+        }
+        entry.row = row;
+        return entry.node;
+      }
+      function createDetailView() {
+        const panel = document.createElement('div');
+        panel.className = 'detail-panel';
+        const view = { panel, bindings: [] };
+        const heading = document.createElement('div'),
+          identity = document.createElement('div');
+        heading.className = 'detail-heading';
+        identity.className = 'detail-title';
+        view.title = document.createElement('h2');
+        view.meta = document.createElement('p');
+        view.meta.className = 'detail-meta';
+        identity.append(view.title, view.meta);
+        heading.append(identity);
+        const controls = document.createElement('div'),
+          actions = document.createElement('div');
+        actions.className = 'detail-actions';
+        for (const [kind, label] of [
+          ['id', '复制响应 ID'],
+          ['fields', '复制解析字段']
+        ]) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'action copy-action';
+          button.textContent = label;
+          button.dataset.copy = kind;
+          button.addEventListener('click', () => copyDetail(kind, button));
+          actions.append(button);
+        }
+        view.feedback = document.createElement('p');
+        view.feedback.className = 'copy-feedback';
+        view.feedback.setAttribute('role', 'status');
+        controls.append(actions, view.feedback);
+        heading.append(controls);
+        panel.append(heading);
+        const time = (value) => formatTime(value, true).replace('（北京时间）', '');
+        const fieldList = (fields) => {
+          const list = document.createElement('dl');
+          list.className = 'detail-fields';
+          for (const [label, key, format] of fields) {
+            const dt = document.createElement('dt'),
+              dd = document.createElement('dd');
+            dt.textContent = label;
+            list.append(dt, dd);
+            view.bindings.push({ node: dd, key, format, missing: '未记录', value: Symbol() });
+          }
+          return list;
+        };
+        const grid = document.createElement('div');
+        grid.className = 'detail-grid';
+        for (const [name, fields] of [
+          [
+            '时间 · 北京时间',
+            [
+              ['请求开始', 'request_started_at', time],
+              ['响应创建', 'response_created_at', time],
+              ['响应完成', 'response_completed_at', time],
+              ['首条日志', 'first_logged_at', time],
+              ['终态日志', 'final_logged_at', time],
+              ['服务端响应历时', 'response_duration_ms', duration],
+              ['完整请求耗时', 'elapsed_ms', duration]
+            ]
+          ],
+          [
+            '请求与返回',
+            [
+              ['请求模型', 'request_model'],
+              ['返回模型', 'response_model'],
+              ['请求档位', 'request_effort'],
+              ['首个返回档位', 'first_effort'],
+              ['最终返回档位', 'final_effort'],
+              ['HTTP 状态', 'http_status'],
+              ['服务档位', 'service_tier']
+            ]
+          ]
+        ]) {
+          const section = document.createElement('section'),
+            label = document.createElement('h3');
+          label.textContent = name;
+          section.append(label, fieldList(fields));
+          grid.append(section);
+        }
+        panel.append(grid);
+        const usage = document.createElement('section'),
+          usageTitle = document.createElement('h3'),
+          usageList = document.createElement('dl');
+        usage.className = 'detail-usage';
+        usageTitle.textContent = 'Token 用量';
+        usageList.className = 'usage-grid';
+        for (const [label, key] of [
+          ['输入', 'input_tokens'],
+          ['缓存命中', 'cached_input_tokens'],
+          ['缓存写入', 'cache_write_tokens'],
+          ['输出', 'output_tokens'],
+          ['推理', 'reasoning_tokens'],
+          ['总计', 'total_tokens']
+        ]) {
+          const item = document.createElement('div'),
+            dt = document.createElement('dt'),
+            dd = document.createElement('dd');
+          dt.textContent = label;
+          item.append(dt, dd);
+          usageList.append(item);
+          view.bindings.push({
+            node: dd,
+            key,
+            format: (value) => (value == null ? '—' : numberFormat.format(value)),
+            missing: '—',
+            value: Symbol()
+          });
+        }
+        const usageNote = document.createElement('p');
+        usageNote.className = 'detail-note';
+        usageNote.textContent = '均为终态 usage 原值；缓存和推理为明细项，不与输入、输出重复相加。';
+        usage.append(usageTitle, usageList, usageNote);
+        panel.append(usage);
+        const ids = document.createElement('div');
+        ids.className = 'detail-identity';
+        ids.append(
+          fieldList([
+            ['响应 ID', 'response_id'],
+            ['对话 ID', 'thread_id'],
+            ['轮次 ID', 'turn_id'],
+            ['响应事件', 'response_event'],
+            ['原始状态', 'response_status']
+          ])
+        );
+        panel.append(ids);
+        view.comparison = document.createElement('p');
+        panel.append(view.comparison);
+        view.error = document.createElement('p');
+        view.error.className = 'detail-error';
+        view.error.hidden = true;
+        panel.append(view.error);
+        const note = document.createElement('p');
+        note.className = 'detail-note';
+        note.textContent =
+          '请求参数来自本地会话记录。服务端响应历时为响应创建到完成的时间，不代表完整请求耗时。';
+        panel.append(note);
+        const raw = document.createElement('details'),
+          rawTitle = document.createElement('summary'),
+          rawNote = document.createElement('p'),
+          rawText = document.createElement('pre');
+        raw.className = 'raw-fields';
+        rawTitle.textContent = '查看全部解析字段';
+        rawNote.className = 'detail-note';
+        rawNote.textContent =
+          'null 表示未记录或尚未关联。timestamp 仅供内部排序，不能作为请求时间；明确来源的时间见各个 *_at 字段。';
+        rawText.tabIndex = 0;
+        raw.addEventListener('toggle', () => {
+          if (raw.open && detailRecord) setText(rawText, JSON.stringify(detailRecord, null, 2));
+        });
+        raw.append(rawTitle, rawNote, rawText);
+        panel.append(raw);
+        view.raw = raw;
+        view.rawText = rawText;
+        detailCell.append(panel);
+        return view;
+      }
+      async function copyDetail(kind, button) {
+        const row = detailRecord;
+        if (!row) return;
+        button.disabled = true;
+        setText(detailView.feedback, '');
+        detailView.feedback.classList.remove('red');
+        try {
+          await navigator.clipboard.writeText(
+            kind === 'id' ? row.response_id : JSON.stringify(row, null, 2)
+          );
+          if (detailRecord?.response_id === row.response_id)
+            setText(detailView.feedback, kind === 'id' ? '已复制响应 ID' : '已复制解析字段');
+        } catch {
+          if (detailRecord?.response_id === row.response_id) {
+            setText(detailView.feedback, '复制失败，请选中文字后手动复制。');
+            detailView.feedback.classList.add('red');
+          }
+        } finally {
+          button.disabled = false;
+        }
+      }
+      function responseDetails(row) {
+        if (detailRecord === row) return detailRow;
+        const view = detailView ?? (detailView = createDetailView()),
+          changedResponse = detailRecord?.response_id !== row.response_id;
+        detailRecord = row;
+        if (changedResponse) {
+          view.raw.open = false;
+          setText(view.rawText, '');
+          setText(view.feedback, '');
+          view.feedback.classList.remove('red');
+        }
+        setText(view.title, row.title ?? (row.thread_id ? '未命名对话' : '等待关联的响应'));
+        setText(
+          view.meta,
+          [
+            row.transport ?? '传输未记录',
+            row.turn == null ? '轮次未记录' : '第 ' + numberFormat.format(row.turn) + ' 轮',
+            row.status
+          ].join(' · ')
+        );
+        for (const binding of view.bindings) {
+          const value = row[binding.key];
+          if (binding.value === value) continue;
+          binding.value = value;
+          const text = binding.format ? binding.format(value) : (value ?? binding.missing);
+          setText(binding.node, text);
+          const style = 'mono' + (value == null || text === '未记录' ? ' muted' : '');
+          if (binding.node.className !== style) binding.node.className = style;
+        }
+        const style =
+          'detail-comparison' +
+          (row.match === 'mismatch' ? ' amber' : row.match === 'match' ? '' : ' muted');
+        if (view.comparison.className !== style) view.comparison.className = style;
+        setText(view.comparison, comparison(row));
+        const error = [
+          row.error_code ? '错误代码：' + row.error_code : '',
+          row.error_message ? '错误说明：' + row.error_message : '',
+          row.incomplete_reason ? '未完成原因：' + row.incomplete_reason : ''
+        ]
+          .filter(Boolean)
+          .join('\n');
+        setText(view.error, error);
+        if (view.error.hidden !== !error) view.error.hidden = !error;
+        if (view.raw.open) {
+          const top = view.rawText.scrollTop;
+          setText(view.rawText, JSON.stringify(row, null, 2));
+          view.rawText.scrollTop = top;
+        }
+        return detailRow;
+      }
+      function matchesFilter(row, query = '') {
+        return (
+          (filter === 'all' ||
+            (filter === 'mismatch' && row.match === 'mismatch') ||
+            (filter === 'failed' && row.status === '失败') ||
+            (filter === 'unlinked' && !row.thread_id)) &&
+          (!query || searchText(row).includes(query))
+        );
+      }
+      function searchText(row) {
+        let text = searchCache.get(row);
+        if (text === undefined) {
+          text = [...Object.values(row), cellView(row, 'transport').main, matchLabel(row), formatTime(rowTime(row).at, true)]
+            .join('\n')
+            .toLowerCase();
+          searchCache.set(row, text);
+        }
+        return text;
+      }
+      function updatePosition() {
+        const atTop = viewport.scrollTop <= 8;
+        if (atTop) unseenIds.clear();
+        if ($('latest').hidden !== atTop) $('latest').hidden = atTop;
+        if ($('position-hint').hidden === atTop) $('position-hint').hidden = !atTop;
+        const scoped = filter !== 'all' || $('search').value.trim();
+        setText(
+          $('latest'),
+          unseenIds.size
+            ? '↑ ' + unseenIds.size + (scoped ? ' 条新匹配' : ' 条新响应')
+            : '↑ 回到最新'
+        );
+      }
+      function scrollAnchor() {
+        if (viewport.scrollTop <= 8) return null;
+        const box = viewport.getBoundingClientRect(),
+          head = tableHead.getBoundingClientRect();
+        const edge = Math.max(box.top, 0) + head.height + 3,
+          children = bodyRows.children;
+        let low = 0,
+          high = children.length;
+        while (low < high) {
+          const mid = (low + high) >> 1;
+          if (children[mid].getBoundingClientRect().bottom <= edge) low = mid + 1;
+          else high = mid;
+        }
+        const node = children[low];
+        return node ? { node, top: node.getBoundingClientRect().top } : null;
+      }
+      function renderFromTop() {
+        viewport.scrollTop = 0;
+        unseenIds.clear();
+        render();
+      }
+      function acceptSnapshot(next) {
+        const previous = new Map(data.rows.map((row) => [row.response_id, row]));
+        if (next.base != null) {
+          if (next.base !== etag) {
+            etag = null;
+            throw Error('日志窗口需要重新同步');
+          }
+          const changes = new Map(next.rows.map((row) => [row.response_id, row]));
+          const rows = next.order.map((id) => changes.get(id) || previous.get(id));
+          if (rows.some((row) => !row)) {
+            etag = null;
+            throw Error('日志窗口需要重新同步');
+          }
+          next = { ...next, rows };
+        }
+        if (viewport.scrollTop > 8) {
+          const query = $('search').value.trim().toLowerCase(),
+            matchingIds = new Set();
+          for (const row of next.rows) {
+            if (!matchesFilter(row, query)) continue;
+            matchingIds.add(row.response_id);
+            const old = previous.get(row.response_id);
+            if (etag && (!old || !matchesFilter(old, query))) unseenIds.add(row.response_id);
+          }
+          for (const id of unseenIds) if (!matchingIds.has(id)) unseenIds.delete(id);
+        }
+        data = next;
+      }
+      function renderEmptyState() {
+        let title, text;
+        if (data.rows.length) {
+          title = '没有匹配的响应';
+          text = '试试其他筛选条件或关键词。';
+        } else if (paused) {
+          title = '已暂停页面更新';
+          text = '点击「继续更新」查看最新采集状态。';
+        } else if ($('error').textContent) {
+          title = '无法连接查看器';
+          text = '正在自动重连。请确认启动终端仍在运行，并使用终端显示的地址。';
+        } else if (etag == null) {
+          title = '正在连接查看器';
+          text = '连接后将显示日志读取进度。';
+        } else if (data.loading) {
+          title = '正在加载已有记录';
+          text = data.status || '正在准备读取本地日志。';
+        } else {
+          title = '暂无响应记录';
+          text = data.status || '新响应到达后会自动显示，可在下方查看采集状态。';
+        }
+        setText(emptyTitle, title);
+        setText(emptyText, text);
+        clearFilters.hidden = !data.rows.length;
+      }
+      function render() {
+        if (renderFrame !== null) {
+          cancelAnimationFrame(renderFrame);
+          renderFrame = null;
+        }
+        const atTop = viewport.scrollTop <= 8,
+          anchor = atTop ? null : scrollAnchor(),
+          focused = document.activeElement,
+          hadFocus = bodyRows.contains(focused);
+        const query = $('search').value.trim().toLowerCase();
+        const items = data.rows.filter((row) => matchesFilter(row, query));
+        const retained = new Set(data.rows.map((row) => row.response_id));
+        for (const [id, entry] of rowNodes) {
+          if (!retained.has(id)) {
+            entry.node.remove();
+            rowNodes.delete(id);
+          }
+        }
+        if (expandedId && !retained.has(expandedId)) expandedId = null;
+        if (!expandedId && detailRecord) {
+          detailRecord = null;
+          detailView = null;
+          detailCell.replaceChildren();
+        }
+        const wanted = [];
+        for (const row of items) {
+          wanted.push(responseRow(row));
+          if (expandedId === row.response_id) wanted.push(responseDetails(row));
+        }
+        if (!items.length) {
+          renderEmptyState();
+          wanted.push(emptyRow);
+        }
+        const body = $('rows');
+        let cursor = body.firstElementChild;
+        for (const node of wanted) {
+          if (node === cursor) cursor = cursor.nextElementSibling;
+          else body.insertBefore(node, cursor);
+        }
+        while (cursor) {
+          const next = cursor.nextElementSibling;
+          cursor.remove();
+          cursor = next;
+        }
+        if (atTop) viewport.scrollTop = 0;
+        else if (anchor?.node.isConnected)
+          viewport.scrollTop += anchor.node.getBoundingClientRect().top - anchor.top;
+        if (hadFocus && !focused.isConnected) viewport.focus({ preventScroll: true });
+        else if (hadFocus && document.activeElement !== focused)
+          focused.focus({ preventScroll: true });
+        updatePosition();
+        const counts = { all: data.rows.length, mismatch: 0, failed: 0, unlinked: 0 };
+        for (const row of data.rows) {
+          if (row.match === 'mismatch') counts.mismatch++;
+          if (row.status === '失败') counts.failed++;
+          if (!row.thread_id) counts.unlinked++;
+        }
+        const names = { all: '全部', mismatch: '不一致', failed: '失败', unlinked: '待关联' };
+        for (const button of document.querySelectorAll('[data-filter]')) {
+          const value = button.dataset.filter,
+            pressed = String(filter === value);
+          setText(button, names[value] + ' ' + counts[value]);
+          if (button.getAttribute('aria-pressed') !== pressed)
+            button.setAttribute('aria-pressed', pressed);
+        }
+        setText(
+          $('count'),
+          items.length +
+            (items.length === data.rows.length ? '' : ' / ' + data.rows.length) +
+            ' 条响应'
+        );
+        if (data.display_limit != null) {
+          setText($('window'), '上限 ' + data.display_limit + ' 条');
+          setText(
+            $('retention'),
+            '展示上限 ' +
+              data.display_limit +
+              ' 条 · 当前缓存 ' +
+              data.retained_count +
+              ' / ' +
+              data.retention_limit +
+              ' 条'
+          );
+        }
+        if (data.updated_at)
+          setText($('updated'), '更新于 ' + formatTime(Date.parse(data.updated_at) / 1000));
+        const diagnostics = data.diagnostics || {};
+        setText(
+          $('sources'),
+          diagnostics.log_dir
+            ? '常规日志目录（配置）：' +
+              diagnostics.log_dir +
+              '　桌面日志目录：' +
+              (diagnostics.desktop_log_dir || '未启用')
+            : ''
+        );
+        setText(
+          $('trigger'),
+          diagnostics.sqlite_log_error
+            ? '启动时未能检查 SQLite 日志：' + diagnostics.sqlite_log_error + '。查看器从文件采集响应。'
+            : diagnostics.blocked_sqlite_log_insert
+              ? '启动检查发现 SQLite 触发器 codex_block_logs_insert；是否影响写入取决于其定义。查看器从文件采集响应。'
+              : ''
+        );
+      }
+      function updateLive() {
+        const failed = Boolean($('error').textContent),
+          badge = $('live').parentElement;
+        renderEmptyState();
+        setText(
+          $('status'),
+          paused
+            ? '页面已暂停更新，点击「继续更新」获取最新采集状态。'
+            : failed
+              ? '无法连接查看器，暂时无法确认采集状态。请检查启动终端。'
+              : data.status || (etag == null ? '等待连接查看器。' : '已读取响应日志，正在等待新记录。')
+        );
+        setText($('pause'), paused ? '继续更新' : '暂停更新');
+        setText(
+          $('live'),
+          paused
+            ? '已暂停'
+            : failed
+              ? '连接中断'
+              : document.hidden
+                ? '后台采集'
+                : data.loading
+                  ? '读取中'
+                  : etag == null
+                    ? '连接中'
+                    : '实时更新'
+        );
+        const title = paused
+          ? '页面已暂停更新，点击「继续更新」获取最新数据'
+          : failed
+            ? '暂时无法连接查看器；页面恢复连接后会继续更新'
+            : document.hidden
+              ? '页面隐藏，后端继续采集'
+              : data.loading
+                ? data.status || '正在准备读取本地日志'
+                : '后端每秒采集，数据变化后立即通知页面';
+        const style = 'live' + (paused || document.hidden ? ' muted' : failed ? ' amber' : '');
+        if (badge.title !== title) badge.title = title;
+        if (badge.className !== style) badge.className = style;
+      }
+      function schedule(delay = 0) {
+        clearTimeout(timer);
+        timer = null;
+        if (!paused && !document.hidden) timer = setTimeout(refresh, delay);
+      }
+      async function refresh() {
+        clearTimeout(timer);
+        timer = null;
+        if (paused || document.hidden || inFlight) return;
+        inFlight = true;
+        controller = new AbortController();
+        let delay = 0;
+        try {
+          const headers = etag ? { 'If-None-Match': etag, 'X-Row-Delta': '1' } : {};
+          if (etag && !$('error').textContent) headers.Prefer = 'wait=25';
+          const response = await fetch('/api/rows', {
+            cache: 'no-store',
+            headers,
+            signal: controller.signal
+          });
+          if (response.status !== 304) {
+            if (!response.ok) throw Error('HTTP ' + response.status);
+            const next = await response.json();
+            if (!paused && !document.hidden) {
+              acceptSnapshot(next);
+              etag = response.headers.get('ETag');
+              render();
+            }
+          }
+          retryDelay = 1000;
+          setText($('error'), '');
+        } catch (error) {
+          if (error.name !== 'AbortError') {
+            setText($('error'), '连接中断。请确认查看器的启动终端仍在运行，并使用终端显示的地址。');
+            delay = retryDelay;
+            retryDelay = Math.min(retryDelay * 2, 8000);
+          }
+        } finally {
+          inFlight = false;
+          controller = null;
+          updateLive();
+          schedule(delay);
+        }
+      }
+      function syncRefresh() {
+        updateLive();
+        if (paused || document.hidden) {
+          clearTimeout(timer);
+          timer = null;
+          controller?.abort();
+        } else if (!inFlight) schedule();
+      }
+      $('search').addEventListener('input', () => {
+        if (renderFrame === null) renderFrame = requestAnimationFrame(renderFromTop);
+      });
+      bodyRows.addEventListener('click', (event) => {
+        const button = event.target.closest('.expand');
+        if (!button) return;
+        const id = button.closest('.record-row').dataset.responseId;
+        expandedId = expandedId === id ? null : id;
+        render();
+      });
+      for (const button of document.querySelectorAll('[data-filter]'))
+        button.addEventListener('click', () => {
+          filter = button.dataset.filter;
+          renderFromTop();
+        });
+      $('latest').addEventListener('click', () => {
+        viewport.scrollTop = 0;
+        updatePosition();
+      });
+      viewport.addEventListener('scroll', updatePosition, { passive: true });
+      document.addEventListener('keydown', (event) => {
+        if (
+          event.defaultPrevented ||
+          !themeMenu.hidden ||
+          event.isComposing ||
+          event.ctrlKey ||
+          event.metaKey ||
+          event.altKey
+        )
+          return;
+        const editing = event.target.closest('input,textarea,select,[contenteditable="true"]');
+        if (event.key === '/' && !editing) {
+          event.preventDefault();
+          $('search').focus();
+        }
+        if (event.key === 'Escape') {
+          if (event.target === $('search') && $('search').value) {
+            event.preventDefault();
+            $('search').value = '';
+            renderFromTop();
+          } else if (!editing && expandedId) {
+            event.preventDefault();
+            const button = rowNodes.get(expandedId)?.button;
+            expandedId = null;
+            render();
+            button?.focus({ preventScroll: true });
+          }
+        }
+      });
+      $('pause').onclick = () => {
+        paused = !paused;
+        syncRefresh();
+      };
+      document.addEventListener('visibilitychange', syncRefresh);
+      const systemTheme = matchMedia('(prefers-color-scheme: dark)');
+      const themeControl = $('theme-control'),
+        themeButton = $('theme'),
+        themeMenu = $('theme-menu'),
+        themeOptions = [...themeMenu.querySelectorAll('[data-theme-option]')];
+      const themeNames = { light: '浅色', dark: '深色', system: '跟随系统' };
+      function applyTheme(mode, persist = false) {
+        const root = document.documentElement,
+          theme = mode === 'system' ? (systemTheme.matches ? 'dark' : 'light') : mode;
+        if (root.dataset.themeMode !== mode) root.dataset.themeMode = mode;
+        if (root.dataset.theme !== theme) root.dataset.theme = theme;
+        const label =
+          '切换主题，当前：' +
+          themeNames[mode] +
+          (mode === 'system' ? '（' + themeNames[theme] + '）' : '');
+        if (themeButton.getAttribute('aria-label') !== label)
+          themeButton.setAttribute('aria-label', label);
+        if (themeButton.title !== label) themeButton.title = label;
+        setText($('theme-label'), themeNames[mode]);
+        for (const option of themeOptions) {
+          const checked = String(option.dataset.themeOption === mode);
+          if (option.getAttribute('aria-checked') !== checked)
+            option.setAttribute('aria-checked', checked);
+        }
+        setText(
+          $('theme-system-state'),
+          '当前为' + themeNames[systemTheme.matches ? 'dark' : 'light']
+        );
+        if (persist)
+          try {
+            localStorage.setItem('codex-response-theme', mode);
+          } catch {}
+      }
+      function focusThemeOption(index) {
+        for (const [i, option] of themeOptions.entries()) option.tabIndex = i === index ? 0 : -1;
+        themeOptions[index].focus({ preventScroll: true });
+      }
+      function openThemeMenu(index = 0) {
+        themeMenu.hidden = false;
+        themeButton.setAttribute('aria-expanded', 'true');
+        focusThemeOption(index);
+      }
+      function closeThemeMenu(restoreFocus = false) {
+        if (themeMenu.hidden) return;
+        themeMenu.hidden = true;
+        themeButton.setAttribute('aria-expanded', 'false');
+        for (const option of themeOptions) option.tabIndex = -1;
+        if (restoreFocus) themeButton.focus({ preventScroll: true });
+      }
+      themeButton.addEventListener('click', (event) => {
+        if (themeMenu.hidden)
+          openThemeMenu(
+            event.detail === 0
+              ? 0
+              : themeOptions.findIndex((option) => option.getAttribute('aria-checked') === 'true')
+          );
+        else closeThemeMenu();
+      });
+      for (const option of themeOptions)
+        option.addEventListener('click', () => {
+          applyTheme(option.dataset.themeOption, true);
+          closeThemeMenu(true);
+        });
+      themeControl.addEventListener('keydown', (event) => {
+        if (event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+        const key = event.key,
+          last = themeOptions.length - 1;
+        if (themeMenu.hidden) {
+          if (key === 'ArrowDown' || key === 'ArrowUp') {
+            event.preventDefault();
+            openThemeMenu(key === 'ArrowUp' ? last : 0);
+          }
+          return;
+        }
+        const index = themeOptions.indexOf(document.activeElement);
+        if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(key)) {
+          event.preventDefault();
+          event.stopPropagation();
+          focusThemeOption(
+            key === 'Home'
+              ? 0
+              : key === 'End'
+                ? last
+                : key === 'ArrowDown'
+                  ? (index + 1) % themeOptions.length
+                  : index <= 0
+                    ? last
+                    : index - 1
+          );
+        } else if (key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          closeThemeMenu(true);
+        } else if (key === 'Tab') {
+          closeThemeMenu(true);
+        }
+      });
+      document.addEventListener('pointerdown', (event) => {
+        if (!themeMenu.hidden && !themeControl.contains(event.target)) closeThemeMenu();
+      });
+      themeControl.addEventListener('focusout', (event) => {
+        if (!themeControl.contains(event.relatedTarget)) closeThemeMenu();
+      });
+      applyTheme(document.documentElement.dataset.themeMode);
+      systemTheme.addEventListener('change', () =>
+        applyTheme(document.documentElement.dataset.themeMode)
+      );
+      window.addEventListener('storage', (event) => {
+        if (event.key === 'codex-response-theme')
+          applyTheme(['light', 'dark'].includes(event.newValue) ? event.newValue : 'system');
+      });
+      render();
+      updateLive();
+      schedule(0);
+    </script>
+  </body>
+</html>
