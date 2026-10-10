@@ -1221,8 +1221,11 @@ def control(port, action="status", *, timeout=3):
             return None
         if response.status != 200:
             raise OSError("端口服务未通过查看器身份验证，未执行控制操作")
-        result = json.loads(response.read(4096))
-        if result.get("script") != str(Path(__file__).resolve()):
+        try:
+            result = json.loads(response.read(4096))
+        except ValueError as error:
+            raise OSError("端口服务返回了无效的查看器身份信息") from error
+        if not isinstance(result, dict) or result.get("script") != str(Path(__file__).resolve()):
             raise OSError("端口服务不是当前查看器")
         return result
 
@@ -1428,12 +1431,11 @@ def serve_summary(summary, port, lines, open_browser, collector_owns_summary):
         # The winner may be listening before it publishes its credentials.
         # Authenticate that instance; never treat an occupied port as identity.
         deadline = time.monotonic() + 1
-        last_error = bind_error
         while (remaining := deadline - time.monotonic()) > 0:
             try:
                 existing = control(port, timeout=min(remaining, 0.25))
-            except (OSError, http.client.HTTPException) as error:
-                last_error = error
+            except (OSError, http.client.HTTPException):
+                pass
             else:
                 if existing:
                     print(f"查看器已运行：{existing['url']}（沿用当前实例配置，未重复启动）", flush=True)
@@ -1441,7 +1443,8 @@ def serve_summary(summary, port, lines, open_browser, collector_owns_summary):
                         webbrowser.open(existing["url"])
                     return
             time.sleep(min(0.05, max(0, deadline - time.monotonic())))
-        raise last_error
+        server = LocalServer(("127.0.0.1", 0), Handler)
+        print(f"端口 {port} 已被占用，已自动切换到 {server.server_port}。", file=sys.stderr, flush=True)
 
     with server:
         url = f"http://127.0.0.1:{server.server_port}"
@@ -1545,7 +1548,7 @@ def main():
     mode.add_argument("--stop", action="store_true", help="停止指定端口的本查看器")
     mode.add_argument("--status", action="store_true", help="查看指定端口的运行状态")
     parser.add_argument("--no-open", action="store_true", help="不自动打开浏览器")
-    parser.add_argument("--port", type=int, default=8765, help="网页端口，默认 8765；0 自动分配")
+    parser.add_argument("--port", type=int, default=8765, help="网页端口，默认 8765；占用时自动换用空闲端口，0 自动分配")
     parser.add_argument("--json", action="store_true", help="配合 --once 输出详细元数据 JSON")
     parser.add_argument("-n", "--lines", type=int, default=20, help="启动时显示最近 N 条，默认 20；0 只显示后续响应")
     parser.add_argument("--thread", help="只显示指定对话 ID")

@@ -2,6 +2,7 @@
 
 import contextlib
 import errno
+import http.client
 import io
 import json
 import os
@@ -211,9 +212,13 @@ class StartupRaceTests(LogFixture):
                     raise TimeoutError("synthetic startup gate timed out")
 
         def control(port, *args, **kwargs):
-            if not (runtime / f"{port}.json").exists():
+            result = real_control(port, *args, **kwargs)
+            if result is None:
                 retrying.set()
-            return real_control(port, *args, **kwargs)
+                # Release the winner from the first failed probe so the
+                # reuse deadline does not depend on the test thread waking.
+                release.set()
+            return result
 
         def start(port):
             try:
@@ -234,7 +239,6 @@ class StartupRaceTests(LogFixture):
                 loser = threading.Thread(target=start, args=(port,), daemon=True)
                 loser.start()
                 self.assertTrue(retrying.wait(2))
-                release.set()
                 loser.join(3)
                 self.assertFalse(loser.is_alive())
                 self.assertEqual(errors, [])
@@ -243,10 +247,10 @@ class StartupRaceTests(LogFixture):
                 self.assertEqual(real_control(port)["script"], str(SCRIPT.resolve()))
             finally:
                 release.set()
-                if observed:
+                for server in observed:
                     deadline = time.monotonic() + 3
-                    while winner.is_alive() and time.monotonic() < deadline:
-                        if real_control(observed[0].server_port, "stop"):
+                    while (winner.is_alive() or (loser is not None and loser.is_alive())) and time.monotonic() < deadline:
+                        if real_control(server.server_port, "stop"):
                             break
                         time.sleep(0.01)
                 winner.join(3)
@@ -256,16 +260,18 @@ class StartupRaceTests(LogFixture):
             self.assertEqual(errors, [])
             self.assertEqual(list(runtime.glob("*.json")), [])
 
-    def test_occupied_foreign_port_is_never_reused_or_stopped(self):
+    def test_occupied_foreign_port_falls_back_without_reusing_or_stopping_it(self):
         requests = []
         runtime = self.home / "runtime"
         runtime.mkdir()
+        default_response = json.dumps({"pid": os.getpid(), "url": "http://127.0.0.1",
+                                       "script": str(SCRIPT) + ".foreign"}).encode()
+        foreign_response = default_response
 
         class ForeignHandler(watch.BaseHTTPRequestHandler):
             def do_POST(handler):
                 requests.append(handler.path)
-                data = json.dumps({"pid": os.getpid(), "url": "http://127.0.0.1",
-                                   "script": str(SCRIPT) + ".foreign"}).encode()
+                data = foreign_response
                 handler.send_response(200)
                 handler.send_header("Content-Length", str(len(data)))
                 handler.end_headers()
@@ -279,18 +285,72 @@ class StartupRaceTests(LogFixture):
             thread = threading.Thread(target=foreign.serve_forever, daemon=True)
             thread.start()
             try:
-                started = time.monotonic()
-                with self.assertRaises(OSError) as occupied:
-                    watch.serve(self.summary(), foreign.server_port, 20, False)
-                self.assertEqual(occupied.exception.errno, errno.EADDRINUSE)
-                self.assertLess(time.monotonic() - started, 2)
-                self.assertEqual(requests, [])
                 state = watch.control_path(foreign.server_port)
-                state.write_text(json.dumps({"token": "synthetic-token", "pid": os.getpid()}))
-                with self.assertRaisesRegex(OSError, "不是当前查看器"):
-                    watch.serve(self.summary(), foreign.server_port, 20, False)
-                self.assertTrue(requests)
-                self.assertEqual(set(requests), {"/api/control/status"})
+                for stale_state, foreign_response in ((False, default_response), (True, default_response),
+                                                      (True, b"OK"), (True, b"[]"), (True, b"null")):
+                    with self.subTest(stale_state=stale_state, response=foreign_response):
+                        if stale_state:
+                            state.write_text(json.dumps({"token": "synthetic-token", "pid": os.getpid()}))
+                            original_state = state.read_bytes()
+                        ready, browser_opened = threading.Event(), threading.Event()
+                        observed, errors = [], []
+                        output, notices = io.StringIO(), io.StringIO()
+                        requests.clear()
+
+                        class ObservedServer(watch.ThreadingHTTPServer):
+                            def serve_forever(server, *args, **kwargs):
+                                observed.append(server)
+                                ready.set()
+                                super().serve_forever(*args, **kwargs)
+
+                        def start():
+                            try:
+                                watch.serve(self.summary(), foreign.server_port, 20, True)
+                            except Exception as error:
+                                errors.append(error)
+
+                        with mock.patch.object(watch, "ThreadingHTTPServer", ObservedServer), \
+                             mock.patch.object(watch.webbrowser, "open", side_effect=lambda url: browser_opened.set()) as opener, \
+                             contextlib.redirect_stdout(output), contextlib.redirect_stderr(notices):
+                            viewer = threading.Thread(target=start, daemon=True)
+                            started = time.monotonic()
+                            viewer.start()
+                            try:
+                                self.assertTrue(ready.wait(3), errors)
+                                self.assertLess(time.monotonic() - started, 3)
+                                server = observed[0]
+                                port = server.server_port
+                                url = f"http://127.0.0.1:{port}"
+                                self.assertNotEqual(port, foreign.server_port)
+                                self.assertEqual(server.server_address, ("127.0.0.1", port))
+                                self.assertIn("实时表格：" + url, output.getvalue())
+                                self.assertIn(f"端口 {foreign.server_port} 已被占用，已自动切换到 {port}", notices.getvalue())
+                                self.assertNotIn("未重复启动", output.getvalue())
+                                self.assertTrue(browser_opened.wait(1))
+                                opener.assert_called_once_with(url)
+                                self.assertEqual(watch.control(port)["url"], url)
+                                self.assertTrue(watch.control_path(port).is_file())
+                                with contextlib.closing(http.client.HTTPConnection("127.0.0.1", port, timeout=2)) as connection:
+                                    connection.request("GET", "/api/rows", headers={"Origin": url})
+                                    response = connection.getresponse()
+                                    self.assertEqual(response.status, 200)
+                                    self.assertIn("rows", json.loads(response.read()))
+                            finally:
+                                if ready.wait(1) and viewer.is_alive():
+                                    watch.control(observed[0].server_port, "stop")
+                                viewer.join(3)
+                        self.assertFalse(viewer.is_alive())
+                        self.assertEqual(errors, [])
+                        self.assertFalse(watch.control_path(port).exists())
+                        self.assertTrue(thread.is_alive())
+                        if stale_state:
+                            self.assertEqual(state.read_bytes(), original_state)
+                            self.assertTrue(requests)
+                            self.assertEqual(set(requests), {"/api/control/status"})
+                        else:
+                            self.assertFalse(state.exists())
+                            self.assertEqual(requests, [])
+                foreign_response = default_response
                 requests.clear()
                 with self.assertRaisesRegex(OSError, "不是当前查看器"):
                     watch.control(foreign.server_port, "stop")
