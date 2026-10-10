@@ -43,9 +43,9 @@ python3 --version
 python3 codex_sse_watch.py --web -n 200
 ```
 
-浏览器会打开 <http://127.0.0.1:8765/>。请保留终端运行；关闭网页不会停止采集，终端中按 Ctrl+C 退出。Python 脚本和 HTML 文件需要放在同一目录，通过本机服务访问页面。
+浏览器会打开终端打印的地址，默认使用 <http://127.0.0.1:8765/>；端口被其他程序占用时会自动换用空闲端口。请保留终端运行；关闭网页不会停止采集，终端中按 Ctrl+C 退出。Python 脚本和 HTML 文件需要放在同一目录，通过本机服务访问页面。
 
-macOS 也可以双击 `scripts/start.command` 启动，双击 `scripts/status.command` 查看状态，或双击 `scripts/stop.command` 停止本目录实例。脚本使用 PATH 中的 `python3`。
+macOS 也可以双击 `scripts/start.command` 启动，双击 `scripts/status.command` 查看状态，或双击 `scripts/stop.command` 停止本目录默认端口的实例。端口自动切换后，使用下方命令并传入实际端口查看状态或停止。脚本使用 PATH 中的 `python3`。
 
 ### 3. 确认采集
 
@@ -79,7 +79,7 @@ python3 codex_sse_watch.py --web --log /path/to/response.log -n 200
 | --- | --- |
 | `--web` | 启动本机网页；默认端口为 `8765` |
 | `-n N` / `--lines N` | 最近记录数量，默认 `20`；快速开始和双击脚本使用 `200`，网页最多展示 `5000` 条 |
-| `--port N` | 指定端口；启动时 `0` 表示自动分配，状态与停止命令须使用实际端口 |
+| `--port N` | 优先使用指定端口，被其他程序占用时自动换用空闲端口；启动时 `0` 表示自动分配，状态与停止命令须使用实际端口 |
 | `--thread ID` | 只显示指定会话 |
 | `--once --json` | 输出一次完整解析元数据后退出 |
 | `--home PATH` | 指定 Codex 配置目录；默认取 `CODEX_HOME` 或 `~/.codex` |
